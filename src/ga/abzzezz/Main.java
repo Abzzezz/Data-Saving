@@ -6,14 +6,14 @@ public class Main {
 
     public static void main(String[] args) {
         SaveObject saveObject = new SaveObject();
-        saveObject.putByte("Penos", (byte) 1);
+        saveObject.putByte("2", (byte) 1);
         saveObject.putBoolean("ayy", true);
-        saveObject.putString("aes", "{\"ayy\"w:\":\"true\"}");
+        saveObject.putString("aes", "bitte kein AES :CCCCC");
         System.out.println(saveObject.toString());
 
         SaveObject saveObject1 = new SaveObject(saveObject.toString());
 
         System.out.println(saveObject1.getBoolean("ayy"));
-        System.out.println(saveObject1.getString("aes"));
+        System.out.println(saveObject1.getString("2"));
     }
 }

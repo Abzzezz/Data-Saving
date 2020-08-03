@@ -4,7 +4,7 @@ package ga.abzzezz.util;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Hashtable;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -15,16 +15,31 @@ import java.util.stream.Collectors;
  */
 
 public class SaveObject {
+    private final CharFormatter charFormatter = new CharFormatter(new HashMap<>() {
+        {
+            {
+                put("\"", "\\\"\\");
+                put("\n", "\\n");
+                put("\r", "\\r");
+                put("\\", "\\\\");
+                put("\t", "\\t");
+                put("\b", "\\b");
+            }
+        }
+    });
 
-    private final Hashtable<String, String> stringValueHashtable = new Hashtable<>();
-    private final Hashtable<String, String> map = new Hashtable<>();
+    private final Map<String, Object> stringValueHashtable = new HashMap<>() {
+        @Override
+        public Object put(String key, Object value) {
+            return super.put(charFormatter.format(key), charFormatter.format(value.toString()));
+        }
+    };
 
     public SaveObject(final String string) {
         this.load(string);
     }
 
     public SaveObject() {
-
     }
 
     public void putInt(final String key, final int value) {
@@ -65,8 +80,7 @@ public class SaveObject {
     }
 
     public void put(final String key, final Object value) {
-        //Replace quotes
-        stringValueHashtable.put(key, value.toString().replace("\"", "\\\"\\"));
+        stringValueHashtable.put(key, value.toString());
     }
 
     public Object get(final String key) {
@@ -78,7 +92,7 @@ public class SaveObject {
     }
 
     public String getString(final String key) {
-        return get(key).toString();
+        return charFormatter.rebuild(get(key).toString());
     }
 
     public char getChar(final String key) {
@@ -122,8 +136,8 @@ public class SaveObject {
         return stringValueHashtable.entrySet().stream().map(this::format).collect(Collectors.joining());
     }
 
-    private String format(final Map.Entry<String, String> entry) {
-        final String s = decode(entry.getKey()).concat(SEPARATOR).concat(decode(entry.getValue())).concat(BLOCK_END);
+    private String format(final Map.Entry<String, Object> entry) {
+        final String s = decode(entry.getKey()).concat(SEPARATOR).concat(decode(entry.getValue().toString())).concat(BLOCK_END);
         return BLOCK_START.concat(s.length() + "\"" + s);
     }
 
@@ -133,6 +147,7 @@ public class SaveObject {
 
     private void load(final String string) {
         final StringBuilder blocks = new StringBuilder(string);
+
         while (blocks.length() > 0) {
             //Find next start
             final int startBlock = blocks.indexOf(BLOCK_START);
@@ -145,21 +160,42 @@ public class SaveObject {
             //Get end, based on blocks length
             final int endBlock = blocks.indexOf(BLOCK_END, startBlock + blockLength);
             //Get key and value, also replace quotation marks
-            final String key = decode(blocks.substring(keyStart + 1, indexColon)).replace("\\\"\\", "\"");
-            final String value = decode(blocks.substring(indexColon + SEPARATOR.length(), endBlock)).replace("\\\"\\", "\"");
+            final String key = charFormatter.rebuild(decode(blocks.substring(keyStart + 1, indexColon)));
+            final String value = decode(blocks.substring(indexColon + SEPARATOR.length(), endBlock));
             //Put
             this.stringValueHashtable.put(key, value);
-            this.map.put(key, value);
             //Delete from blocks list
             blocks.delete(startBlock, endBlock + BLOCK_END.length());
         }
     }
 
-    public Hashtable<String, String> getLoaded() {
-        return map;
+    public Map<String, Object> getAll() {
+        return stringValueHashtable;
     }
 
-    public Hashtable<String, String> getAll() {
-        return stringValueHashtable;
+    static class CharFormatter {
+
+        private final HashMap<String, String> keyReplace = new HashMap<>();
+
+        public CharFormatter(final String[] disallowed, final String[] replacement) {
+            for (int i = 0; i < disallowed.length; i++) {
+                keyReplace.put(disallowed[i], replacement[i]);
+            }
+        }
+
+        public CharFormatter(HashMap<String, String> stringStringHashMap) {
+            keyReplace.putAll(stringStringHashMap);
+        }
+
+        public String format(final String string) {
+            return string.chars().parallel().mapToObj(value -> String.valueOf((char) value)).map(value -> keyReplace.getOrDefault(value, value)).collect(Collectors.joining());
+        }
+
+        public String rebuild(String string) {
+            for (Map.Entry<String, String> stringStringEntry : keyReplace.entrySet()) {
+                string = string.replace(stringStringEntry.getValue(), stringStringEntry.getKey());
+            }
+            return string;
+        }
     }
 }
