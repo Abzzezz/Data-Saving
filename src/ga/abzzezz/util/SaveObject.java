@@ -1,8 +1,7 @@
 package ga.abzzezz.util;
 
 
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -14,7 +13,6 @@ import java.util.stream.Collectors;
 /**
  * Simple data saving api to use in my projects.
  * Nothing compared to libraries such as JSON, GSON etc.
- * TODO: maybe format blocks instantly? then store full blocks based on the key. -> Block length etc. (actually really unnecessary)
  */
 
 public class SaveObject {
@@ -200,6 +198,20 @@ public class SaveObject {
     private String format(final Map.Entry<String, Object> entry) {
         final String s = decode(entry.getKey()).concat(SEPARATOR).concat(decode(entry.getValue().toString())).concat(BLOCK_END);
         return BLOCK_START.concat(s.length() + "\"" + s);
+    }
+
+    public String get(final File file) throws FileNotFoundException {
+        return new BufferedReader(new FileReader(file)).lines().collect(Collectors.joining());
+    }
+
+    public void save(final File file, final boolean append) {
+        try {
+            final FileOutputStream fileOutputStream = new FileOutputStream(file, append);
+            fileOutputStream.write(toString().getBytes());
+            fileOutputStream.close();
+        } catch (IOException e) {
+            new SaveObjectException("Writing to file").printStackTrace();
+        }
     }
 
     private static final String BLOCK_START = "{";

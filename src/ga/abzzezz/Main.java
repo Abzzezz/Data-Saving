@@ -3,6 +3,7 @@ package ga.abzzezz;
 import ga.abzzezz.util.SaveObject;
 
 import java.io.Serializable;
+import java.util.prefs.Preferences;
 
 public class Main implements Serializable {
 
@@ -12,6 +13,7 @@ public class Main implements Serializable {
     }
 
     public void x() {
+
         SaveObject saveObject = new SaveObject();
         saveObject.putByte("2", (byte) 1);
         saveObject.putBoolean("ayy", true).putString("aes", "bitte kein AES :CCCCC").putArray("key", new String[]{"test", "test1", "lol", "I really hate my life"});
