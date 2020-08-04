@@ -1,9 +1,12 @@
 package ga.abzzezz.util;
 
 
+import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -15,13 +18,13 @@ import java.util.stream.Collectors;
  */
 
 public class SaveObject {
+
     private final CharFormatter charFormatter = new CharFormatter(new HashMap<>() {
         {
             {
                 put("\"", "\\\"\\");
                 put("\n", "\\n");
                 put("\r", "\\r");
-                put("\\", "\\\\");
                 put("\t", "\\t");
                 put("\b", "\\b");
             }
@@ -30,8 +33,8 @@ public class SaveObject {
 
     private final Map<String, Object> stringValueHashtable = new HashMap<>() {
         @Override
-        public Object put(String key, Object value) {
-            return super.put(charFormatter.format(key), charFormatter.format(value.toString()));
+        public Object get(Object key) {
+            return charFormatter.rebuild(super.get(charFormatter.format(key.toString())).toString());
         }
     };
 
@@ -42,45 +45,75 @@ public class SaveObject {
     public SaveObject() {
     }
 
-    public void putInt(final String key, final int value) {
+    public SaveObject putInt(final String key, final int value) {
         put(key, value);
+        return this;
     }
 
-    public void putString(final String key, final String value) {
+    public SaveObject putString(final String key, final String value) {
         put(key, value);
+        return this;
     }
 
-    public void putDouble(final String key, final double value) {
-        put(key, value);
+    public SaveObject put(final String key, final SaveObject saveObject) {
+        putString(key, saveObject.toString());
+        return this;
     }
 
-    public void putFloat(final String key, final float value) {
+    public SaveObject putDouble(final String key, final double value) {
         put(key, value);
+        return this;
     }
 
-    public void putLong(final String key, final long value) {
+    public SaveObject putFloat(final String key, final float value) {
         put(key, value);
+        return this;
     }
 
-    public void putByte(final String key, final byte value) {
+    public SaveObject putLong(final String key, final long value) {
         put(key, value);
+        return this;
     }
 
-    public void putChar(final String key, final char value) {
+    public SaveObject putByte(final String key, final byte value) {
+        put(key, value);
+        return this;
+    }
+
+    public SaveObject putChar(final String key, final char value) {
         //Generally same as put int.
         putInt(key, value);
+        return this;
     }
 
-    public void putShort(final String key, final short value) {
+    public SaveObject putCollection(final String key, final Collection<?> list) {
+        put(key, list.stream().map(Object::toString).collect(Collectors.joining(",")));
+        return this;
+    }
+
+    public <E> SaveObject putArray(final String key, final E[] array) {
+        put(key, Arrays.stream(array).map(Object::toString).collect(Collectors.joining(",")));
+        return this;
+    }
+
+    public SaveObject putMap(final String key, final Map<?, ?> map) {
+        put(key, map.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(Collectors.joining(",")));
+        return this;
+    }
+
+    public SaveObject putShort(final String key, final short value) {
         put(key, value);
+        return this;
     }
 
-    public void putBoolean(final String key, final boolean value) {
+    public SaveObject putBoolean(final String key, final boolean value) {
         put(key, value);
+        return this;
     }
 
-    public void put(final String key, final Object value) {
-        stringValueHashtable.put(key, value.toString());
+    public SaveObject put(final String key, final Object value) {
+        stringValueHashtable.put(charFormatter.format(key), charFormatter.format(value.toString()));
+        return this;
     }
 
     public Object get(final String key) {
@@ -92,7 +125,7 @@ public class SaveObject {
     }
 
     public String getString(final String key) {
-        return charFormatter.rebuild(get(key).toString());
+        return get(key).toString();
     }
 
     public char getChar(final String key) {
@@ -123,11 +156,39 @@ public class SaveObject {
         return Long.parseLong(getString(key));
     }
 
+    public Collection<?> getList(final String key) {
+        return Arrays.asList(getArray(key));
+    }
+
+    public String[] getArray(final String key) {
+        try {
+            return getString(key).split(",");
+        } catch (IllegalArgumentException e) {
+            new SaveObjectException("Collecting array").printStackTrace();
+            return new String[0];
+        }
+    }
+
+    public Map<?, ?> getMap(final String key) {
+        final Map map = new HashMap<>();
+        try {
+            final String value = getString(key);
+            final String[] entries = value.split(",");
+            for (String entry : entries) {
+                final String[] keyAndValue = entry.split("=");
+                map.put(keyAndValue[0], keyAndValue[1]);
+            }
+        } catch (RuntimeException e) {
+            new SaveObjectException("Collecting hashmap").printStackTrace();
+        }
+        return map;
+    }
+
     private String decode(final String string) {
         try {
             return URLDecoder.decode(string, StandardCharsets.UTF_8.name());
         } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+            new SaveObjectException("Decoding charset not supported").printStackTrace();
         }
         return "";
     }
@@ -147,25 +208,29 @@ public class SaveObject {
 
     private void load(final String string) {
         final StringBuilder blocks = new StringBuilder(string);
-
         while (blocks.length() > 0) {
-            //Find next start
-            final int startBlock = blocks.indexOf(BLOCK_START);
-            //Find the start of the key, also to calculate the blocks length
-            final int keyStart = blocks.indexOf("\"", startBlock);
-            //Get the index of the colon, to separate key and value
-            final int indexColon = blocks.indexOf(SEPARATOR, keyStart);
-            //Calculate length
-            final int blockLength = Integer.parseInt(blocks.substring(startBlock + 1, keyStart));
-            //Get end, based on blocks length
-            final int endBlock = blocks.indexOf(BLOCK_END, startBlock + blockLength);
-            //Get key and value, also replace quotation marks
-            final String key = charFormatter.rebuild(decode(blocks.substring(keyStart + 1, indexColon)));
-            final String value = decode(blocks.substring(indexColon + SEPARATOR.length(), endBlock));
-            //Put
-            this.stringValueHashtable.put(key, value);
-            //Delete from blocks list
-            blocks.delete(startBlock, endBlock + BLOCK_END.length());
+            try {
+                //Find next start
+                final int startBlock = blocks.indexOf(BLOCK_START);
+                //Find the start of the key, also to calculate the blocks length
+                final int keyStart = blocks.indexOf("\"", startBlock);
+                //Get the index of the colon, to separate key and value
+                final int indexColon = blocks.indexOf(SEPARATOR, keyStart);
+                //Calculate length
+                final int blockLength = Integer.parseInt(blocks.substring(startBlock + 1, keyStart));
+                //Get end, based on blocks length
+                final int endBlock = blocks.indexOf(BLOCK_END, startBlock + blockLength);
+                //Get key and value, also replace quotation marks
+                final String key = charFormatter.rebuild(decode(blocks.substring(keyStart + 1, indexColon)));
+                final String value = decode(blocks.substring(indexColon + SEPARATOR.length(), endBlock));
+                //Put
+                this.stringValueHashtable.put(key, value);
+                //Delete from blocks list
+                blocks.delete(startBlock, endBlock + BLOCK_END.length());
+            } catch (RuntimeException e) {
+                new SaveObjectException("The loaded in data string is damaged: " + e.getMessage()).printStackTrace();
+            }
+
         }
     }
 
@@ -173,10 +238,21 @@ public class SaveObject {
         return stringValueHashtable;
     }
 
-    static class CharFormatter {
+    /**
+     * Class to replace certain characters with a counterpart and rereplace them
+     * Takes in either two array (have to be same length & order to work obv.)
+     * or a hashmap
+     */
+    public static class CharFormatter {
 
-        private final HashMap<String, String> keyReplace = new HashMap<>();
+        private final Map<String, String> keyReplace = new HashMap<>();
 
+        /**
+         * Takes in two similar arrays
+         *
+         * @param disallowed  chars to be replaced
+         * @param replacement replacement
+         */
         public CharFormatter(final String[] disallowed, final String[] replacement) {
             for (int i = 0; i < disallowed.length; i++) {
                 keyReplace.put(disallowed[i], replacement[i]);
@@ -196,6 +272,28 @@ public class SaveObject {
                 string = string.replace(stringStringEntry.getValue(), stringStringEntry.getKey());
             }
             return string;
+        }
+    }
+
+    /**
+     * Simple throwable to display errors when working with this api & give reasoning
+     */
+    public static class SaveObjectException extends Throwable {
+
+        public final String reason;
+
+        public SaveObjectException(String reason) {
+            this.reason = reason;
+        }
+
+        @Override
+        public String getMessage() {
+            return "Exception thrown while operating on data: " + reason;
+        }
+
+        @Override
+        public void printStackTrace(PrintStream s) {
+            super.printStackTrace(s);
         }
     }
 }
